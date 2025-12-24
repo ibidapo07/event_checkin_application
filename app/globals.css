@@ -123,3 +123,34 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* QR Scanner Styles */
+#qr-reader {
+  border: none !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 0.75rem;
+}
+
+#qr-reader__scan_region {
+  min-height: 100% !important;
+}
+
+#qr-reader__dashboard {
+  display: none !important;
+}
+
+#qr-reader__dashboard_section_csr button {
+  display: none !important;
+}
+
+/* Hide the built-in QR box */
+#qr-shaded-region {
+  display: none !important;
+}

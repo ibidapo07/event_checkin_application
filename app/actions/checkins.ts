@@ -55,6 +55,28 @@ export async function checkInGuest(hostCode: string): Promise<CheckInResult> {
       return { success: false, message: "Invalid QR code - host not found" }
     }
 
+    // Check current check-in count BEFORE allowing new check-in
+    const { count: currentCheckIns } = await supabase
+      .from("check_ins")
+      .select("*", { count: "exact", head: true })
+      .eq("host_id", host.id)
+
+    const currentCount = currentCheckIns || 0
+
+    // Validate capacity - reject if at or over capacity
+    if (currentCount >= host.guest_capacity) {
+      return {
+        success: false,
+        message: `Section "${host.section_name}" is at full capacity (${currentCount}/${host.guest_capacity})`,
+        data: {
+          hostName: host.name,
+          sectionName: host.section_name,
+          guestCapacity: host.guest_capacity,
+          totalCheckIns: currentCount,
+        },
+      }
+    }
+
     // Record the check-in using Service Role to bypass RLS
     const { error: insertError } = await supabase.from("check_ins").insert({
       host_id: host.id,
@@ -66,11 +88,7 @@ export async function checkInGuest(hostCode: string): Promise<CheckInResult> {
       return { success: false, message: "Failed to record check-in" }
     }
 
-    // Get total check-ins for this host
-    const { count } = await supabase
-      .from("check_ins")
-      .select("*", { count: "exact", head: true })
-      .eq("host_id", host.id)
+    const newTotalCheckIns = currentCount + 1
 
     // Revalidate the dashboard
     revalidatePath("/dashboard")
@@ -82,7 +100,7 @@ export async function checkInGuest(hostCode: string): Promise<CheckInResult> {
         hostName: host.name,
         sectionName: host.section_name,
         guestCapacity: host.guest_capacity,
-        totalCheckIns: count || 1,
+        totalCheckIns: newTotalCheckIns,
       },
     }
   } catch (error) {

@@ -25,6 +25,8 @@ export default function ScannerPage() {
   const [html5QrCode, setHtml5QrCode] = useState<Html5Qrcode | null>(null)
   const [cameraReady, setCameraReady] = useState(false)
   const scannerRef = useRef<HTMLDivElement>(null)
+  const isProcessingRef = useRef(false) // Use ref to track processing state reliably
+  const lastScannedCode = useRef<string | null>(null) // Track last scanned code to prevent duplicates
   const { toast } = useToast()
 
   // Cleanup on unmount
@@ -85,14 +87,24 @@ export default function ScannerPage() {
   }
 
   const onScanSuccess = useCallback(async (decodedText: string) => {
-    // Prevent multiple scans while processing
-    if (isProcessing) return
+    // Prevent multiple scans while processing using ref (not state, which has stale closure issues)
+    if (isProcessingRef.current) return
     
+    // Prevent scanning the same code twice in quick succession
+    if (lastScannedCode.current === decodedText) return
+    
+    // Mark as processing immediately
+    isProcessingRef.current = true
+    lastScannedCode.current = decodedText
     setIsProcessing(true)
     
-    // Pause scanning
+    // Pause scanning immediately
     if (html5QrCode) {
-      await html5QrCode.pause(true)
+      try {
+        await html5QrCode.pause(true)
+      } catch (e) {
+        // Ignore pause errors
+      }
     }
 
     await checkInHost(decodedText)
@@ -106,9 +118,14 @@ export default function ScannerPage() {
           // Scanner might have been stopped
         }
       }
+      isProcessingRef.current = false
       setIsProcessing(false)
+      // Clear last scanned code after delay to allow re-scanning same code later
+      setTimeout(() => {
+        lastScannedCode.current = null
+      }, 2000)
     }, 3000)
-  }, [html5QrCode, isProcessing])
+  }, [html5QrCode])
 
   const onScanFailure = (error: string) => {
     // Ignore scan failures - they happen frequently when no QR is in view

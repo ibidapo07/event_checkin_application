@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -37,6 +38,7 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
   const [isPending, startTransition] = useTransition()
   const [showAddForm, setShowAddForm] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   // Update hosts when initialHosts changes (after revalidation)
   useEffect(() => {
@@ -94,7 +96,11 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
   }
 
   const handleLogout = async () => {
-    await logout()
+    const result = await logout()
+    if (result.success) {
+      router.push("/login")
+      router.refresh()
+    }
   }
 
   const downloadQRCode = async (host: Host) => {

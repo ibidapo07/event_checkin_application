@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
@@ -28,6 +29,7 @@ export default function ScannerPage() {
   const isProcessingRef = useRef(false) // Use ref to track processing state reliably
   const lastScannedCode = useRef<string | null>(null) // Track last scanned code to prevent duplicates
   const { toast } = useToast()
+  const router = useRouter()
 
   // Cleanup on unmount
   useEffect(() => {
@@ -176,7 +178,11 @@ export default function ScannerPage() {
   }
 
   const handleLogout = async () => {
-    await logout()
+    const result = await logout()
+    if (result.success) {
+      router.push("/login")
+      router.refresh()
+    }
   }
 
   const dismissResult = () => {

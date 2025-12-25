@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   const [hosts, setHosts] = useState<HostWithCheckIns[]>([])
   const [stats, setStats] = useState<DashboardStats>({ totalHosts: 0, totalCapacity: 0, totalCheckIns: 0 })
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
     fetchDashboardData()
@@ -102,7 +104,11 @@ export default function DashboardPage() {
   }
 
   const handleLogout = async () => {
-    await logout()
+    const result = await logout()
+    if (result.success) {
+      router.push("/login")
+      router.refresh()
+    }
   }
 
   if (isLoading) {

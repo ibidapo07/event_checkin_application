@@ -2,12 +2,13 @@
 
 import type React from "react"
 import { useState, useEffect, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { QrCode, Users, Download, Trash2, LogOut, Loader2 } from "lucide-react"
+import { QrCode, Users, Download, Trash2, LogOut, Loader2, Plus, MapPin, UserCircle } from "lucide-react"
 import Link from "next/link"
 import QRCode from "qrcode"
 import type { Host } from "@/lib/types"
@@ -35,7 +36,9 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
   const [quantity, setQuantity] = useState("")
   const [hosts, setHosts] = useState<Host[]>(initialHosts)
   const [isPending, startTransition] = useTransition()
+  const [showAddForm, setShowAddForm] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   // Update hosts when initialHosts changes (after revalidation)
   useEffect(() => {
@@ -62,6 +65,7 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
         setName("")
         setSectionName("")
         setQuantity("")
+        setShowAddForm(false)
       } else {
         toast({
           title: "Error",
@@ -92,7 +96,11 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
   }
 
   const handleLogout = async () => {
-    await logout()
+    const result = await logout()
+    if (result.success) {
+      router.push("/login")
+      router.refresh()
+    }
   }
 
   const downloadQRCode = async (host: Host) => {
@@ -125,37 +133,139 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-      <div className="mx-auto max-w-4xl flex flex-col gap-6">
-        <div className="flex gap-3 justify-between">
-          <div className="flex gap-3">
-            <Button asChild variant="outline">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b px-4 py-3">
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <h1 className="text-lg sm:text-xl font-bold">Party Hosts</h1>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="hidden sm:flex">
               <Link href="/scanner">
                 <QrCode className="w-4 h-4 mr-2" />
-                Scan Tickets
+                Scanner
               </Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" size="sm" className="hidden sm:flex">
               <Link href="/dashboard">
                 <Users className="w-4 h-4 mr-2" />
-                Check-in Dashboard
+                Dashboard
               </Link>
             </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
         </div>
+      </header>
 
+      {/* Mobile Navigation */}
+      <div className="sm:hidden flex gap-2 p-4 pb-0">
+        <Button asChild variant="outline" size="sm" className="flex-1">
+          <Link href="/scanner">
+            <QrCode className="w-4 h-4 mr-2" />
+            Scanner
+          </Link>
+        </Button>
+        <Button asChild variant="outline" size="sm" className="flex-1">
+          <Link href="/dashboard">
+            <Users className="w-4 h-4 mr-2" />
+            Dashboard
+          </Link>
+        </Button>
+      </div>
+
+      {/* Content */}
+      <main className="p-4 max-w-4xl mx-auto flex flex-col gap-4">
+        {/* Hosts List Card */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Birthday Party Hosts</CardTitle>
-            <CardDescription>View all hosts and download their QR codes</CardDescription>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg sm:text-xl">Birthday Party Hosts</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Manage hosts and their QR codes</CardDescription>
+              </div>
+              <Button 
+                onClick={() => setShowAddForm(!showAddForm)} 
+                size="sm"
+                variant={showAddForm ? "secondary" : "default"}
+              >
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">{showAddForm ? "Cancel" : "Add Host"}</span>
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent>
+          
+          {/* Add Host Form - Collapsible on mobile */}
+          {showAddForm && (
+            <CardContent className="border-t pt-4">
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="name" className="text-xs sm:text-sm">Host Name</Label>
+                    <Input
+                      id="name"
+                      type="text"
+                      placeholder="Enter host name"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="text-base"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="section" className="text-xs sm:text-sm">Section Name</Label>
+                    <Input
+                      id="section"
+                      type="text"
+                      placeholder="e.g., Main Hall"
+                      required
+                      value={sectionName}
+                      onChange={(e) => setSectionName(e.target.value)}
+                      className="text-base"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="quantity" className="text-xs sm:text-sm">Capacity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="1"
+                      placeholder="0"
+                      required
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      className="text-base"
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" disabled={isPending} className="w-full sm:w-auto sm:self-end">
+                  {isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Host
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          )}
+          
+          <CardContent className={showAddForm ? "pt-4 border-t" : ""}>
             {hosts.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">No hosts added yet. Add your first host below!</p>
+              <div className="text-center py-12">
+                <UserCircle className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground text-sm">No hosts added yet</p>
+                <p className="text-muted-foreground text-xs">Tap "Add Host" to get started</p>
+              </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {hosts.map((host) => (
@@ -171,67 +281,7 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
             )}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">Add New Host</CardTitle>
-            <CardDescription>Enter host details to assign them to a section</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <div className="flex gap-4 items-end">
-                <div className="flex-1 flex flex-col gap-2">
-                  <Label htmlFor="name">Host Name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Enter host name"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex-1 flex flex-col gap-2">
-                  <Label htmlFor="section">Section Name</Label>
-                  <Input
-                    id="section"
-                    type="text"
-                    placeholder="e.g., Main Hall, Garden"
-                    required
-                    value={sectionName}
-                    onChange={(e) => setSectionName(e.target.value)}
-                  />
-                </div>
-
-                <div className="w-32 flex flex-col gap-2">
-                  <Label htmlFor="quantity">Capacity</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    min="1"
-                    placeholder="0"
-                    required
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                  />
-                </div>
-
-                <Button type="submit" disabled={isPending} className="px-8">
-                  {isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Adding...
-                    </>
-                  ) : (
-                    "Add Host"
-                  )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+      </main>
     </div>
   )
 }
@@ -258,57 +308,64 @@ function HostCard({ host, onDownload, onDelete, isDeleting }: HostCardProps) {
   }, [host.code])
 
   return (
-    <div className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-      <div className="flex items-center gap-6">
-        <div>
-          <p className="font-semibold text-foreground">{host.name}</p>
-          <p className="text-sm text-muted-foreground">Host</p>
-        </div>
-        <div className="h-8 w-px bg-border" />
-        <div>
-          <p className="font-medium text-foreground">{host.section_name}</p>
-          <p className="text-sm text-muted-foreground">Section</p>
-        </div>
-        <div className="h-8 w-px bg-border" />
-        <div className="text-right">
-          <p className="font-semibold text-lg text-foreground">{host.guest_capacity}</p>
-          <p className="text-sm text-muted-foreground">Capacity</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-4">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors gap-3">
+      {/* Host Info */}
+      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+        {/* QR Code - visible on both mobile and desktop */}
         {qrCodeUrl && (
-          <div className="p-2 bg-white rounded-lg border">
-            <img src={qrCodeUrl || "/placeholder.svg"} alt={`QR code for ${host.name}`} className="w-20 h-20" />
+          <div className="p-1.5 sm:p-2 bg-white rounded-lg border flex-shrink-0">
+            <img 
+              src={qrCodeUrl || "/placeholder.svg"} 
+              alt={`QR code for ${host.name}`} 
+              className="w-14 h-14 sm:w-16 sm:h-16" 
+            />
           </div>
         )}
-        <div className="flex gap-2">
-          <Button onClick={() => onDownload(host)} size="sm" variant="default">
-            <Download className="w-4 h-4 mr-2" />
-            Download QR
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button size="sm" variant="destructive" disabled={isDeleting}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Host</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete {host.name}? This will also delete all their check-in records.
-                  This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(host.id, host.name)}>
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+        
+        {/* Details */}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm sm:text-base truncate">{host.name}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              {host.section_name}
+            </span>
+            <span className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              {host.guest_capacity} guests
+            </span>
+          </div>
         </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 pl-[70px] sm:pl-0">
+        <Button onClick={() => onDownload(host)} size="sm" variant="default" className="flex-1 sm:flex-none">
+          <Download className="w-4 h-4 sm:mr-2" />
+          <span className="sm:inline">Download</span>
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" variant="destructive" disabled={isDeleting}>
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Host</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {host.name}? This will also delete all their check-in records.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(host.id, host.name)}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )

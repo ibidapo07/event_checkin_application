@@ -204,8 +204,14 @@ export async function loginWithCode(formData: FormData): Promise<ActionResult> {
 
 /**
  * Logs out the user by deleting the session cookie.
+ * Returns success status - client should handle redirect.
  */
-export async function logout(): Promise<void> {
-  await deleteSession()
-  redirect("/login")
+export async function logout(): Promise<ActionResult> {
+  try {
+    await deleteSession()
+    return { success: true, message: "Logged out successfully" }
+  } catch (error) {
+    console.error("Error in logout:", error)
+    return { success: false, message: "Failed to logout" }
+  }
 }

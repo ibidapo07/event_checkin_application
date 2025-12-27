@@ -8,12 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { QrCode, Users, Download, Trash2, LogOut, Loader2, Plus, MapPin, UserCircle } from "lucide-react"
+import { QrCode, Users, Download, Trash2, LogOut, Loader2, Plus, MapPin, UserCircle, Key, Copy, RefreshCw, Clock } from "lucide-react"
 import Link from "next/link"
 import QRCode from "qrcode"
 import type { Host } from "@/lib/types"
 import { addHost, deleteHost } from "@/app/actions/hosts"
-import { logout } from "@/app/actions/auth"
+import { logout, generatePartyCode, getCurrentPartyCode } from "@/app/actions/auth"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,16 +26,24 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-interface ClientHomeProps {
-  initialHosts: Host[]
+interface PartyCode {
+  code: string
+  expiresAt: string
 }
 
-export default function ClientHome({ initialHosts }: ClientHomeProps) {
+interface ClientHomeProps {
+  initialHosts: Host[]
+  initialPartyCode: PartyCode | null
+}
+
+export default function ClientHome({ initialHosts, initialPartyCode }: ClientHomeProps) {
   const [name, setName] = useState("")
   const [sectionName, setSectionName] = useState("")
   const [quantity, setQuantity] = useState("")
   const [hosts, setHosts] = useState<Host[]>(initialHosts)
+  const [partyCode, setPartyCode] = useState<PartyCode | null>(initialPartyCode)
   const [isPending, startTransition] = useTransition()
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
@@ -44,6 +52,11 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
   useEffect(() => {
     setHosts(initialHosts)
   }, [initialHosts])
+
+  // Update party code when it changes
+  useEffect(() => {
+    setPartyCode(initialPartyCode)
+  }, [initialPartyCode])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -101,6 +114,68 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
       router.push("/login")
       router.refresh()
     }
+  }
+
+  const handleGenerateCode = async () => {
+    setIsGeneratingCode(true)
+    try {
+      const result = await generatePartyCode()
+      
+      if ('error' in result) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      } else {
+        setPartyCode(result)
+        toast({
+          title: "Party Code Generated!",
+          description: "Share this code with your hosts/hostesses.",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate party code",
+        variant: "destructive",
+      })
+    }
+    setIsGeneratingCode(false)
+  }
+
+  const copyCodeToClipboard = async () => {
+    if (partyCode) {
+      try {
+        await navigator.clipboard.writeText(partyCode.code)
+        toast({
+          title: "Copied!",
+          description: "Party code copied to clipboard.",
+        })
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to copy code",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
+  const formatExpiration = (expiresAt: string) => {
+    const date = new Date(expiresAt)
+    const now = new Date()
+    const diffMs = date.getTime() - now.getTime()
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+    
+    if (diffMs <= 0) return "Expired"
+    if (diffHours > 0) return `${diffHours}h ${diffMins}m remaining`
+    return `${diffMins}m remaining`
+  }
+
+  const isCodeExpired = (expiresAt: string) => {
+    return new Date(expiresAt) < new Date()
   }
 
   const downloadQRCode = async (host: Host) => {
@@ -177,6 +252,77 @@ export default function ClientHome({ initialHosts }: ClientHomeProps) {
 
       {/* Content */}
       <main className="p-4 max-w-4xl mx-auto flex flex-col gap-4">
+        
+        {/* Party Code Card */}
+        <Card className="border-2 border-dashed border-indigo-300 bg-indigo-50/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Key className="w-5 h-5 text-indigo-600" />
+              <div>
+                <CardTitle className="text-lg">Scanner Access Code</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Generate a code for hosts/hostesses to access the scanner
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {partyCode && !isCodeExpired(partyCode.expiresAt) ? (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="flex-1 sm:flex-none bg-white border-2 border-indigo-200 rounded-lg px-4 py-3">
+                    <p className="text-3xl sm:text-4xl font-mono font-bold tracking-widest text-center">
+                      {partyCode.code}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={copyCodeToClipboard}
+                    className="flex-shrink-0"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Clock className="w-4 h-4" />
+                    {formatExpiration(partyCode.expiresAt)}
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleGenerateCode}
+                    disabled={isGeneratingCode}
+                    className="w-full sm:w-auto"
+                  >
+                    {isGeneratingCode ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    New Code
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-4">
+                <p className="text-sm text-muted-foreground text-center">
+                  {partyCode ? "The previous code has expired." : "No active code."} Generate a new code for today's event.
+                </p>
+                <Button onClick={handleGenerateCode} disabled={isGeneratingCode}>
+                  {isGeneratingCode ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Key className="w-4 h-4 mr-2" />
+                  )}
+                  Generate Party Code
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Hosts List Card */}
         <Card>
           <CardHeader className="pb-3">
